@@ -3,7 +3,7 @@ services:
     build: .
     container_name: whats_app_farm_llm_service
     ports:
-      - "${PORT:-8000}:${PORT:-8000}"
+      - "${LLM_PORT:-8000}:${LLM_PORT:-8000}"
     env_file:
       - .env
     networks:
