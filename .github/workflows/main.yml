@@ -1,1 +1,50 @@
+name: Whats app farm CI/CD [PY]
 
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ${{ github.ref }} - Checkout
+        uses: actions/checkout@v4
+
+      - name: rsync to server
+        uses: burnett01/rsync-deployments@6.0.0
+        with:
+          switches: -avzr --delete --exclude='.env' --exclude='*.log' --exclude='.git' --exclude='.github' --exclude='docs' --exclude='README.md' --exclude='.env.example'
+          path: ./
+          remote_path: ${{ secrets.REMOTE_PATH }}
+          remote_host: ${{ secrets.HOST }}
+          remote_user: ${{ secrets.USERNAME }}
+          remote_key: ${{ secrets.KEY }}
+          remote_key_pass: ${{ secrets.PASSPHRASE }}
+
+      - name: Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.KEY }}
+          passphrase: ${{ secrets.PASSPHRASE }}
+          script: |
+            cd ${{ secrets.REMOTE_PATH }}
+            cat > .env << 'EOF'
+            LLM_API_KEY=${{ secrets.LLM_API_KEY }}
+            CEREBRAS_MODEL=${{ secrets.CEREBRAS_MODEL }}
+            SYSTEM_PROMPT=${{ secrets.SYSTEM_PROMPT }}
+            LLM_HOST=${{ secrets.LLM_HOST }}
+            LLM_PORT=${{ secrets.LLM_PORT }}
+            EOF
+            docker compose -f docker-compose.dev.yml up -d --build
