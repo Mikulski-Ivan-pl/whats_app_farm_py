@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    container_name: whats_app_farm_llm_service
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    env_file:
+      - .env
+    networks:
+    - whats_app_farm_network
+
+networks:
+  whats_app_farm_network:
+    external: true
