@@ -20,14 +20,15 @@ app = FastAPI(title="LLM Service")
 @app.post("/reply", response_model=ReplyResponse)
 def reply(body: ReplyRequest):
     logger.info(
-        "reply request phone=%s messages=%d has_summary=%s",
+        "reply request phone=%s messages=%d has_summary=%s model=%s",
         body.phone,
         len(body.messages),
         bool(body.summary),
+        body.model or "auto",
     )
     t0 = time.monotonic()
     try:
-        text = get_reply([m.model_dump() for m in body.messages], body.summary, body.system_prompt)
+        text = get_reply([m.model_dump() for m in body.messages], body.summary, body.system_prompt, body.model)
         elapsed = time.monotonic() - t0
         log = logger.warning if elapsed >= _SLOW_THRESHOLD_SEC else logger.info
         log("reply ok phone=%s reply_len=%d duration=%.1fs", body.phone, len(text), elapsed)
@@ -41,13 +42,14 @@ def reply(body: ReplyRequest):
 @app.post("/summarize", response_model=SummarizeResponse)
 def summarize_endpoint(body: SummarizeRequest):
     logger.info(
-        "summarize request phone=%s messages=%d",
+        "summarize request phone=%s messages=%d model=%s",
         body.phone,
         len(body.messages),
+        body.model or "auto",
     )
     t0 = time.monotonic()
     try:
-        text = summarize([m.model_dump() for m in body.messages])
+        text = summarize([m.model_dump() for m in body.messages], body.model)
         elapsed = time.monotonic() - t0
         log = logger.warning if elapsed >= _SLOW_THRESHOLD_SEC else logger.info
         log("summarize ok phone=%s summary_len=%d duration=%.1fs", body.phone, len(text), elapsed)

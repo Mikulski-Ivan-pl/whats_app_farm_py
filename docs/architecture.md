@@ -21,6 +21,7 @@ Go worker → POST /summarize → summarize() → Cerebras API → summary text 
 |---|---|---|
 | Stateless | No DB, no cache | Go owns all session state; Python is a pure function |
 | system_prompt | Passed per-request by Go | Enables per-account prompts without Python changes |
+| model | Passed per-request by Go (`model` field, optional) | Enables per-account model selection; falls back to `CEREBRAS_MODEL` env var when empty |
 | Role mapping | `bot` → `assistant` | Go uses `bot`; Cerebras expects OpenAI-compatible `assistant` |
 | Slow logging | WARNING when ≥ 10s | Makes slow Cerebras responses visible at a glance |
 

@@ -53,12 +53,13 @@ def _call_with_retry(fn, *args, **kwargs):
     raise last_exc
 
 
-def get_reply(messages: list[dict], summary: str = "", system_prompt: str = "") -> str:
+def get_reply(messages: list[dict], summary: str = "", system_prompt: str = "", model: str = "") -> str:
     """Send conversation history to Cerebras and return the AI reply.
 
     Maps Go role names ('bot') to OpenAI-compatible names ('assistant').
     If a summary is provided, it is prepended to the system prompt.
     If system_prompt is provided, it overrides the default from settings.
+    If model is provided, it overrides the default from settings.
     """
     system = system_prompt or settings.system_prompt
     if summary:
@@ -71,20 +72,23 @@ def get_reply(messages: list[dict], summary: str = "", system_prompt: str = "") 
 
     response = _call_with_retry(
         _client.chat.completions.create,
-        model=settings.cerebras_model,
+        model=model or settings.cerebras_model,
         messages=[{"role": "system", "content": system}] + cerebras_messages,
     )
     return response.choices[0].message.content
 
 
-def summarize(messages: list[dict]) -> str:
-    """Ask Cerebras to summarize a conversation."""
+def summarize(messages: list[dict], model: str = "") -> str:
+    """Ask Cerebras to summarize a conversation.
+
+    If model is provided, it overrides the default from settings.
+    """
     text = "\n".join(
         f"{m['role'].upper()}: {m['content']}" for m in messages
     )
     response = _call_with_retry(
         _client.chat.completions.create,
-        model=settings.cerebras_model,
+        model=model or settings.cerebras_model,
         messages=[
             {"role": "system", "content": _SUMMARIZE_PROMPT},
             {"role": "user", "content": text},
