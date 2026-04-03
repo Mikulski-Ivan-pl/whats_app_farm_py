@@ -12,6 +12,7 @@ class ReplyRequest(BaseModel):
     messages: list[Message]
     summary: str = ""
     system_prompt: str = ""
+    model: str = ""
 
 
 class ReplyResponse(BaseModel):
@@ -21,6 +22,7 @@ class ReplyResponse(BaseModel):
 class SummarizeRequest(BaseModel):
     phone: str
     messages: list[Message]
+    model: str = ""
 
 
 class SummarizeResponse(BaseModel):
