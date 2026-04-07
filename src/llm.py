@@ -12,6 +12,7 @@ _client = Cerebras(api_key=settings.llm_api_key)
 _ROLE_MAP = {"bot": "assistant", "user": "user"}
 
 _RETRY_DELAYS = (2, 4, 8)
+_EMPTY_CONTENT_RETRIES = 2
 
 _SUMMARIZE_PROMPT = (
     "Summarize the following conversation briefly and clearly. "
@@ -70,12 +71,22 @@ def get_reply(messages: list[dict], summary: str = "", system_prompt: str = "", 
         for m in messages
     ]
 
-    response = _call_with_retry(
-        _client.chat.completions.create,
-        model=model or settings.cerebras_model,
-        messages=[{"role": "system", "content": system}] + cerebras_messages,
-    )
-    return response.choices[0].message.content
+    for attempt in range(1 + _EMPTY_CONTENT_RETRIES):
+        response = _call_with_retry(
+            _client.chat.completions.create,
+            model=model or settings.cerebras_model,
+            messages=[{"role": "system", "content": system}] + cerebras_messages,
+        )
+        text = response.choices[0].message.content or ""
+        if text:
+            return text
+        logger.warning(
+            "cerebras returned empty content attempt=%d/%d",
+            attempt + 1,
+            1 + _EMPTY_CONTENT_RETRIES,
+        )
+    logger.error("cerebras returned empty content on all attempts, using fallback")
+    return settings.fallback_reply
 
 
 def summarize(messages: list[dict], model: str = "") -> str:
@@ -94,4 +105,4 @@ def summarize(messages: list[dict], model: str = "") -> str:
             {"role": "user", "content": text},
         ],
     )
-    return response.choices[0].message.content
+    return response.choices[0].message.content or ""

@@ -24,6 +24,8 @@ Go worker → POST /summarize → summarize() → Cerebras API → summary text 
 | model | Passed per-request by Go (`model` field, optional) | Enables per-account model selection; falls back to `CEREBRAS_MODEL` env var when empty |
 | Role mapping | `bot` → `assistant` | Go uses `bot`; Cerebras expects OpenAI-compatible `assistant` |
 | Slow logging | WARNING when ≥ 10s | Makes slow Cerebras responses visible at a glance |
+| Empty-content retry | Up to 3 attempts in `get_reply()` | Cerebras occasionally returns HTTP 200 with `content=None` (model quirk / token limit); retrying usually produces a valid reply |
+| Fallback reply | `FALLBACK_REPLY` env var | If all retry attempts return empty, the user gets a polite message instead of silence |
 
 ## Files
 
