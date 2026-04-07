@@ -1,7 +1,9 @@
+import json
 import logging
 import time
 
 from cerebras.cloud.sdk import APIConnectionError, APIStatusError, Cerebras
+from cerebras.cloud.sdk import NOT_GIVEN
 
 from config import settings
 
@@ -54,13 +56,21 @@ def _call_with_retry(fn, *args, **kwargs):
     raise last_exc
 
 
-def get_reply(messages: list[dict], summary: str = "", system_prompt: str = "", model: str = "") -> str:
-    """Send conversation history to Cerebras and return the AI reply.
+def get_reply(
+    messages: list[dict],
+    summary: str = "",
+    system_prompt: str = "",
+    model: str = "",
+    tools: list[dict] | None = None,
+    previous_tool_calls: list[dict] | None = None,
+    tool_results: list[dict] | None = None,
+) -> tuple[str, list[dict]]:
+    """Send conversation history to Cerebras and return (reply, tool_calls).
 
     Maps Go role names ('bot') to OpenAI-compatible names ('assistant').
-    If a summary is provided, it is prepended to the system prompt.
-    If system_prompt is provided, it overrides the default from settings.
-    If model is provided, it overrides the default from settings.
+    If tools is non-empty, enables function calling; may return tool_calls instead of reply.
+    If previous_tool_calls + tool_results are provided, appends them to the conversation
+    so the LLM can continue the agentic loop after executing tools.
     """
     system = system_prompt or settings.system_prompt
     if summary:
@@ -71,22 +81,74 @@ def get_reply(messages: list[dict], summary: str = "", system_prompt: str = "", 
         for m in messages
     ]
 
+    # Reconstruct agentic history: assistant tool_call message + tool result messages.
+    if previous_tool_calls and tool_results:
+        cerebras_messages.append({
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": tc["id"],
+                    "type": "function",
+                    "function": {
+                        "name": tc["name"],
+                        "arguments": json.dumps(tc.get("args", {})),
+                    },
+                }
+                for tc in previous_tool_calls
+            ],
+        })
+        for tr in tool_results:
+            cerebras_messages.append({
+                "role": "tool",
+                "tool_call_id": tr["tool_call_id"],
+                "content": tr["content"],
+            })
+
+    cerebras_tools = NOT_GIVEN
+    if tools:
+        cerebras_tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": t["name"],
+                    "description": t.get("description", ""),
+                    "parameters": t.get("parameters", {"type": "object", "properties": {}}),
+                },
+            }
+            for t in tools
+        ]
+
     for attempt in range(1 + _EMPTY_CONTENT_RETRIES):
         response = _call_with_retry(
             _client.chat.completions.create,
             model=model or settings.cerebras_model,
             messages=[{"role": "system", "content": system}] + cerebras_messages,
+            tools=cerebras_tools,
         )
-        text = response.choices[0].message.content or ""
+
+        choice = response.choices[0]
+        if choice.finish_reason == "tool_calls" and choice.message.tool_calls:
+            result_tool_calls = [
+                {
+                    "id": tc.id,
+                    "name": tc.function.name,
+                    "args": json.loads(tc.function.arguments or "{}"),
+                }
+                for tc in choice.message.tool_calls
+            ]
+            return "", result_tool_calls
+
+        text = choice.message.content or ""
         if text:
-            return text
+            return text, []
         logger.warning(
             "cerebras returned empty content attempt=%d/%d",
             attempt + 1,
             1 + _EMPTY_CONTENT_RETRIES,
         )
     logger.error("cerebras returned empty content on all attempts, using fallback")
-    return settings.fallback_reply
+    return settings.fallback_reply, []
 
 
 def summarize(messages: list[dict], model: str = "") -> str:

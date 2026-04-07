@@ -6,8 +6,16 @@ Stateless FastAPI service. Receives conversation history from the Go backend via
 
 ## Request flow
 
+Normal (no tools):
 ```
-Go worker → POST /reply → get_reply() → Cerebras API → reply text → Go worker
+Go worker → POST /reply → get_reply() → Cerebras API → {reply: "..."} → Go worker
+```
+
+Agentic loop (MCP tools configured for account):
+```
+Go worker → POST /reply + tools       → Cerebras API → {tool_calls: [...]} → Go worker
+Go worker → POST /tools/name @ MCP   (executed by Go, not by this service)
+Go worker → POST /reply + tool_results → Cerebras API → {reply: "..."}   → Go worker
 ```
 
 For summarization (triggered by Go every 20 messages):
@@ -26,6 +34,7 @@ Go worker → POST /summarize → summarize() → Cerebras API → summary text 
 | Slow logging | WARNING when ≥ 10s | Makes slow Cerebras responses visible at a glance |
 | Empty-content retry | Up to 3 attempts in `get_reply()` | Cerebras occasionally returns HTTP 200 with `content=None` (model quirk / token limit); retrying usually produces a valid reply |
 | Fallback reply | `FALLBACK_REPLY` env var | If all retry attempts return empty, the user gets a polite message instead of silence |
+| Tool calling | Python bridges tools to Cerebras; Go executes them | Python stays a pure LLM adapter — no HTTP calls to external services |
 
 ## Files
 

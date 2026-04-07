@@ -27,19 +27,20 @@ Go Backend → HTTP POST → FastAPI (Python) → Cerebras API → Response
 ```
 
 **Endpoints:**
-- `POST /reply` — Takes conversation history + optional system_prompt, returns AI reply
+- `POST /reply` — Takes conversation history + optional system_prompt + optional tools/tool_results; returns either `{reply}` (final text) or `{tool_calls}` (when MCP tool calling is active). Go worker handles the agentic loop and actual MCP server calls; this service is purely the Cerebras bridge.
 - `POST /summarize` — Summarizes conversation history (called by Go every 20 messages)
 - `GET /health` — Returns `{"status": "ok"}`
 
 **Module layout (`src/`):**
 - `main.py` — Route handlers; logs requests ≥10s as WARNING
-- `llm.py` — Cerebras SDK client singleton; maps Go's "bot" role → OpenAI "assistant"
-- `schemas.py` — Pydantic request/response models
+- `llm.py` — Cerebras SDK client singleton; maps Go's "bot" role → OpenAI "assistant"; handles function calling (tools → Cerebras → tool_calls)
+- `schemas.py` — Pydantic request/response models (including MCP tool types)
 - `config.py` — Pydantic Settings loaded from `.env`
 
 **Key design choices:**
 - All conversation context is passed per-request (no server-side session state)
 - `system_prompt` is per-request, enabling per-WhatsApp-account customization
+- Tool calling: Python passes tool definitions to Cerebras and parses `tool_calls` responses — it does NOT call the MCP server directly. Go owns tool execution.
 - Shares a Docker network (`whats_app_farm_network`) with the Go backend
 
 ## Environment Variables
