@@ -1,4 +1,4 @@
-name: Whats app farm CI/CD [PY]
+name: Whats app farm CI/CD [PY-LLM]
 
 on:
   push:
@@ -46,6 +46,7 @@ jobs:
             LLM_API_KEY=${{ secrets.LLM_API_KEY }}
             CEREBRAS_MODEL=${{ secrets.CEREBRAS_MODEL }}
             SYSTEM_PROMPT=${{ secrets.SYSTEM_PROMPT }}
+            FALLBACK_REPLY=${{ secrets.FALLBACK_REPLY }}
             LLM_HOST=${{ secrets.LLM_HOST }}
             LLM_PORT=${{ secrets.LLM_PORT }}
             EOF
