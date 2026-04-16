@@ -6,6 +6,7 @@ from cerebras.cloud.sdk import APIConnectionError, APIStatusError, Cerebras
 from cerebras.cloud.sdk import NOT_GIVEN
 
 from config import settings
+from locale import fallback_reply as _fallback_reply
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ def get_reply(
     If previous_tool_calls + tool_results are provided, appends them to the conversation
     so the LLM can continue the agentic loop after executing tools.
     """
-    system = system_prompt or settings.system_prompt
+    system = system_prompt
     if summary:
         system = f"{system}\n\nConversation summary so far:\n{summary}"
 
@@ -148,7 +149,7 @@ def get_reply(
             1 + _EMPTY_CONTENT_RETRIES,
         )
     logger.error("cerebras returned empty content on all attempts, using fallback")
-    return settings.fallback_reply, []
+    return _fallback_reply(system_prompt), []
 
 
 def summarize(messages: list[dict], model: str = "") -> str:
