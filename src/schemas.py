@@ -44,6 +44,7 @@ class SummarizeRequest(BaseModel):
     phone: str
     messages: list[Message]
     model: str = ""
+    previous_summary: str = ""
 
 
 class SummarizeResponse(BaseModel):

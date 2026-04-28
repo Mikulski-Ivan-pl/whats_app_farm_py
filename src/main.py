@@ -61,7 +61,7 @@ def summarize_endpoint(body: SummarizeRequest):
     )
     t0 = time.monotonic()
     try:
-        text = summarize([m.model_dump() for m in body.messages], body.model)
+        text = summarize([m.model_dump() for m in body.messages], body.previous_summary, body.model)
         elapsed = time.monotonic() - t0
         log = logger.warning if elapsed >= _SLOW_THRESHOLD_SEC else logger.info
         log("summarize ok phone=%s summary_len=%d duration=%.1fs", body.phone, len(text), elapsed)
