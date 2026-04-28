@@ -6,7 +6,7 @@ from cerebras.cloud.sdk import APIConnectionError, APIStatusError, Cerebras
 from cerebras.cloud.sdk import NOT_GIVEN
 
 from config import settings
-from locale import fallback_reply as _fallback_reply
+from locale_strings import fallback_reply as _fallback_reply
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,8 @@ _EMPTY_CONTENT_RETRIES = 2
 _SUMMARIZE_PROMPT = (
     "Summarize the following conversation briefly and clearly. "
     "Focus on key topics, decisions, and context that would help continue the conversation. "
+    "IMPORTANT: Always explicitly preserve in the summary any personal details mentioned: "
+    "client name, phone number, and email address. "
     "Reply with the summary only, no preamble."
 )
 
@@ -152,20 +154,30 @@ def get_reply(
     return _fallback_reply(system_prompt), []
 
 
-def summarize(messages: list[dict], model: str = "") -> str:
+def summarize(messages: list[dict], previous_summary: str = "", model: str = "") -> str:
     """Ask Cerebras to summarize a conversation.
 
+    If previous_summary is provided, it is prepended to the user content so the
+    model can carry forward personal details (name, phone, email) that are no
+    longer present in the trimmed recent-history window.
     If model is provided, it overrides the default from settings.
     """
     text = "\n".join(
         f"{m['role'].upper()}: {m['content']}" for m in messages
     )
+    if previous_summary:
+        user_content = (
+            f"Previous summary (carry forward all personal details from it):\n{previous_summary}"
+            f"\n\nNew messages since last summary:\n{text}"
+        )
+    else:
+        user_content = text
     response = _call_with_retry(
         _client.chat.completions.create,
         model=model or settings.cerebras_model,
         messages=[
             {"role": "system", "content": _SUMMARIZE_PROMPT},
-            {"role": "user", "content": text},
+            {"role": "user", "content": user_content},
         ],
     )
     return response.choices[0].message.content or ""
